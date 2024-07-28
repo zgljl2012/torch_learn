@@ -221,8 +221,9 @@ def main():
 
     if args.save_model and accelerator.is_main_process:
         filename = os.path.join(CHECKPOINTS_DIR, "mnist_cnn.ckpt")
+        # 因为模型在经历 accelerate 后，会在外面带一个模型，所以，此处，如果保存 `model.state_dict()`，会带有 `module.` 的前缀 
         state = {
-            'model': model.state_dict(),
+            'model': model.module.state_dict(),
             'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict(),
         }
