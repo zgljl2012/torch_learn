@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime as dt
 
+LOSS_DIR = 'losses_pngs'
+os.makedirs(LOSS_DIR, exist_ok=True)
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -44,7 +47,7 @@ def draw_losses(losses: List[float]):
     plt.title('Training Loss over Time')
     plt.legend()
     s = dt.now().strftime('%Y-%m-%d_%H_%M_%S')
-    filename = os.path.join('losses_pngs', f'loss_{s}.png')
+    filename = os.path.join(LOSS_DIR, f'loss_{s}.png')
     plt.savefig(filename)
     print(f'Save losses in {filename}')
 
@@ -59,7 +62,7 @@ def draw_multi_losses(losses: List[List[float]]):
     plt.title('Training Loss over Time')
     plt.legend()
     s = dt.now().strftime('%Y-%m-%d_%H_%M_%S')
-    filename = os.path.join('losses_pngs', f'epochs_loss_{s}.png')
+    filename = os.path.join(LOSS_DIR, f'epochs_loss_{s}.png')
     plt.savefig(filename)
     print(f'Save losses in {filename}')
 
@@ -166,6 +169,7 @@ def main():
     model = Net().to(device)
     # 构建优化器
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
+    # optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     # 创建 scheduler
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     # 按轮次训练
