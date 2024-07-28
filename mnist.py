@@ -9,6 +9,8 @@ from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime as dt
+from accelerate import Accelerator
+
 
 LOSS_DIR = 'losses_pngs'
 os.makedirs(LOSS_DIR, exist_ok=True)
@@ -69,7 +71,7 @@ def draw_multi_losses(losses: List[List[float]]):
     plt.savefig(filename)
     print(f'Save losses in {filename}')
 
-def train(args, model, device, train_loader, optimizer, epoch):
+def train(accelerator: Accelerator, args, model, device, train_loader, optimizer, epoch):
     model.train()
     train_loss = []
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -78,7 +80,8 @@ def train(args, model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
-        loss.backward()
+        # loss.backward()
+        accelerator.backward(loss)
         optimizer.step()
         train_loss.append(loss.item())
         if batch_idx % args.log_interval == 0:
@@ -190,12 +193,18 @@ def main():
             scheduler.load_state_dict(state['scheduler'])
         else:
             print(f'Not found {filename}')
+            
+    accelerator = Accelerator()
+
+    model, optimizer, train_loader, scheduler = accelerator.prepare(
+        model, optimizer, train_loader, scheduler
+    )
     
     # 按轮次训练
     epoch_losses = []
     for epoch in range(1, args.epochs + 1):
         # 训练
-        losses = train(args, model, device, train_loader, optimizer, epoch)
+        losses = train(accelerator, args, model, device, train_loader, optimizer, epoch)
         draw_losses(losses)
         epoch_losses.append(losses)
         # 测试
@@ -215,4 +224,6 @@ def main():
         print(f'Save model in {filename}')
 
 if __name__ == '__main__':
+    # 多卡 GPU 训练
+    # accelerate launch --num-processes 2 mnist.py
     main()
