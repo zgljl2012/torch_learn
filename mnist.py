@@ -13,6 +13,9 @@ from datetime import datetime as dt
 LOSS_DIR = 'losses_pngs'
 os.makedirs(LOSS_DIR, exist_ok=True)
 
+CHECKPOINTS_DIR = 'checkpoints'
+os.makedirs(CHECKPOINTS_DIR, exist_ok=True)
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -71,6 +74,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     train_loss = []
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
+        # 梯度清零
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output, target)
@@ -130,6 +134,8 @@ def main():
                         help='how many batches to wait before logging training status')
     parser.add_argument('--save-model', action='store_true', default=False,
                         help='For Saving the current Model')
+    parser.add_argument('--recover-model', action='store_true', default=False,
+                        help='For Recovering the current Model')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_mps = not args.no_mps and torch.backends.mps.is_available()
@@ -170,8 +176,21 @@ def main():
     # 构建优化器
     optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
     # optimizer = optim.AdamW(model.parameters(), lr=args.lr)
+    
     # 创建 scheduler
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+    
+    # recover-train
+    if args.recover_model:
+        filename = os.path.join(CHECKPOINTS_DIR, "mnist_cnn.ckpt")
+        if os.path.exists(filename):
+            state = torch.load(filename)
+            model.load_state_dict(state['model'])
+            optimizer.load_state_dict(state['optimizer'])
+            scheduler.load_state_dict(state['scheduler'])
+        else:
+            print(f'Not found {filename}')
+    
     # 按轮次训练
     epoch_losses = []
     for epoch in range(1, args.epochs + 1):
@@ -186,8 +205,14 @@ def main():
         draw_multi_losses(epoch_losses)
 
     if args.save_model:
-        torch.save(model.state_dict(), "mnist_cnn.pt")
-
+        filename = os.path.join(CHECKPOINTS_DIR, "mnist_cnn.ckpt")
+        state = {
+            'model': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'scheduler': scheduler.state_dict(),
+        }
+        torch.save(state, filename)
+        print(f'Save model in {filename}')
 
 if __name__ == '__main__':
     main()
