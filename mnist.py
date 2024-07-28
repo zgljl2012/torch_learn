@@ -77,12 +77,13 @@ def train(accelerator: Accelerator, args, model, device, train_loader, optimizer
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         # 梯度清零
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        # loss.backward()
-        accelerator.backward(loss)
-        optimizer.step()
+        with accelerator.accumulate(model):
+            optimizer.zero_grad()
+            output = model(data)
+            loss = F.nll_loss(output, target)
+            # loss.backward()
+            accelerator.backward(loss)
+            optimizer.step()
         train_loss.append(loss.item())
         if accelerator.is_main_process:
             if batch_idx % args.log_interval == 0:
@@ -218,7 +219,7 @@ def main():
     if args.epochs > 1:
         draw_multi_losses(epoch_losses)
 
-    if args.save_model:
+    if args.save_model and accelerator.is_main_process:
         filename = os.path.join(CHECKPOINTS_DIR, "mnist_cnn.ckpt")
         state = {
             'model': model.state_dict(),
