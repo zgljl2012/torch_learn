@@ -84,12 +84,13 @@ def train(accelerator: Accelerator, args, model, device, train_loader, optimizer
         accelerator.backward(loss)
         optimizer.step()
         train_loss.append(loss.item())
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-            if args.dry_run:
-                break
+        if accelerator.is_main_process:
+            if batch_idx % args.log_interval == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader), loss.item()))
+                if args.dry_run:
+                    break
     return train_loss
 
 
@@ -205,11 +206,15 @@ def main():
     for epoch in range(1, args.epochs + 1):
         # 训练
         losses = train(accelerator, args, model, device, train_loader, optimizer, epoch)
-        draw_losses(losses)
-        epoch_losses.append(losses)
-        # 测试
-        test(model, device, test_loader)
+        if accelerator.is_main_process:
+            draw_losses(losses)
+            epoch_losses.append(losses)
+            # 测试
+            test(model, device, test_loader)
         scheduler.step()
+    
+    accelerator.wait_for_everyone()
+
     if args.epochs > 1:
         draw_multi_losses(epoch_losses)
 
